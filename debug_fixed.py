@@ -1,39 +1,26 @@
 from fastapi import FastAPI, HTTPException
-from typing import List, Dict, Any
-from pydantic import BaseModel
+from typing import List
 
 app = FastAPI()
+products = []
 
-class Product(BaseModel):
-    name: str
-    price: float
-    stock: int = 0
-
-class StockUpdate(BaseModel):
-    quantity: int
-
-products: List[Dict[str, Any]] = []
-next_id = 0  # Track next available ID
-
-@app.get("/products", response_model=List[Dict[str, Any]])
-def get_products() -> List[Dict[str, Any]]:
+@app.get("/products")
+def get_products() -> List:
     return products
 
-@app.post("/products", response_model=Dict[str, Any])
-def create_product(product: Product):
-    global next_id
-    product_data = product.dict()
-    product_data["id"] = next_id
-    products.append(product_data)
-    next_id += 1  # Increment for next product
-    return {"message": "Created", "id": product_data["id"]}
+@app.post("/products")
+def create_product(product: dict):
+    product["id"] = len(products)
+    products.append(product)
+    return {"message": "Created"}
 
 @app.put("/products/{product_id}/stock")
-def update_stock(product_id: int, stock: StockUpdate):
+def update_stock(product_id: int, quantity: int):
     for product in products:
         if product["id"] == product_id:
-            product["stock"] = stock.quantity
+            product["stock"] = quantity
             return {"message": "Updated"}
+    
     raise HTTPException(status_code=404, detail="Product not found")
 
 @app.delete("/products/{product_id}")
@@ -42,4 +29,11 @@ def delete_product(product_id: int):
         if product["id"] == product_id:
             products.pop(i)
             return {"message": "Deleted"}
+    
     raise HTTPException(status_code=404, detail="Product not found")
+
+# Safe search implementation without SQL injection vulnerability
+@app.get("/search")
+def search_products(name: str):
+    results = [product for product in products if product.get("name") == name]
+    return results
